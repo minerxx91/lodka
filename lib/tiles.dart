@@ -1,10 +1,12 @@
 import 'dart:math';
 import 'package:image/image.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:lodka/json_handler.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'gps.dart';
 
-// Convert latitude, longitude, and zoom level to tile coordinates
+
 List<int> convertToTileCoordinates(double latitude, double longitude, int zoomLevel) {
   double latRad = latitude * (pi / 180.0);
   double lonRad = longitude * (pi / 180.0);
@@ -15,44 +17,22 @@ List<int> convertToTileCoordinates(double latitude, double longitude, int zoomLe
 }
 
 List<dynamic> convertToWorldPixelCoordinates(double latitude, double longitude, int zoomLevel) {
-  // Convert latitude and longitude to radians
+
   double latRad = latitude * (pi / 180.0);
   double lonRad = longitude * (pi / 180.0);
 
-  // Calculate tile coordinates
   num n = pow(2, zoomLevel);
   double tileX = ((longitude + 180.0) / 360.0 * n).floorToDouble();
   double tileY = ((1.0 - log(tan(latRad) + 1.0 / cos(latRad)) / pi) / 2.0 * n).floorToDouble();
 
-  // Calculate pixel coordinates within the tile
-  int tileSize = 256; // Size of each tile in pixels
+  int tileSize = 256;
   double pixelX = ((longitude + 180.0) / 360.0 * n - tileX) * tileSize;
   double pixelY = ((1.0 - log(tan(latRad) + 1.0 / cos(latRad)) / pi) / 2.0 * n - tileY) * tileSize;
 
   return [pixelX.toInt(), pixelY.toInt()];
 }
 
-void main() {
-  /*double latitude = 37.7749;
-  double longitude = -122.4194;
-  int zoomLevel = 1;
-
-  List<int> tileCoordinates = convertToTileCoordinates(latitude, longitude, zoomLevel);
-
-  int tileX = tileCoordinates[0];
-  int tileY = tileCoordinates[1];
-
-  print('Latitude and longitude ($latitude, $longitude) converted to tile coordinates at zoom level $zoomLevel: ($tileX, $tileY)');
-
-  List<dynamic> pixelCoordinates = convertToWorldPixelCoordinates(latitude, longitude, zoomLevel);
-
-  int pixelX = pixelCoordinates[0];
-  int pixelY = pixelCoordinates[1];
-
-  print('World coordinates ($latitude, $longitude) converted to pixel coordinates within a tile at zoom level $zoomLevel: ($pixelX, $pixelY)');*/
-}
-
-Future<String> createAndSetPixelColor(double latitude, double longitude, int zoomLevel, int r, int g, int b) async{
+Future<String> createAndSetPixelColor(double latitude, double longitude, int zoomLevel, List<int> rgb) async{
   double latRad = latitude * (pi / 180.0);
   double lonRad = longitude * (pi / 180.0);
   num n = pow(2, zoomLevel);
@@ -61,16 +41,13 @@ Future<String> createAndSetPixelColor(double latitude, double longitude, int zoo
 
 ///////////////////////////////////////
 
-  // Calculate pixel coordinates within the tile
-  int tileSize = 256; // Size of each tile in pixels
+  int tileSize = 256;
   double x = ((longitude + 180.0) / 360.0 * n - tileX) * tileSize;
   double y = ((1.0 - log(tan(latRad) + 1.0 / cos(latRad)) / pi) / 2.0 * n - tileY) * tileSize;
+  int xCoord = x.round().clamp(0, 255);
+  int yCoord = y.round().clamp(0, 255);
 
 ///////////////////////////////////////////////
-  
-  final image = Image(256, 256);
-
-  image.setPixelRgba(x.round(), y.round(), 0, 255, 0);
 
   final directory = await getApplicationDocumentsDirectory();
   final heatMapPath = '${directory.path}/heatMap';
@@ -81,34 +58,55 @@ Future<String> createAndSetPixelColor(double latitude, double longitude, int zoo
   final file = File(filePath);
   if (await file.exists()) {
     Image? image = decodePng(await file.readAsBytes());
-    if (image?.getPixel(x.round(), y.round()) == 0) {
-      print(image?.getPixel(x.round(), y.round()));
+    if (image?.getPixel(xCoord, yCoord) != 0) { //ak uz je farebny
       return filePath;
     }
-    image?.setPixelRgba(x.round(), y.round(), 0, 255, 0);
-    file.writeAsBytes(encodePng(image!));
+    
+    for (var i = -1; i < 2; i++) {
+      for (var j = -1; j < 2; j++) {
+        image?.setPixelRgba((xCoord+i).clamp(0, 255), (yCoord+j).clamp(0, 255), rgb[0],rgb[1],rgb[2]);
+      }
+    }
+    await file.writeAsBytes(encodePng(image!));
     print('Image saved to: $filePath');
   }
   else{
+    final image = Image(256, 256);
+
+    for (var i = -1; i < 2; i++) {
+      for (var j = -1; j < 2; j++) {
+        image.setPixelRgba((xCoord+i).clamp(0, 255), (yCoord+j).clamp(0, 255), rgb[0],rgb[1],rgb[2]);
+      }
+    }
     await Directory(folderPath).create(recursive: true);
-    // Save the image to the file
-    //final file = File(filePath);
-    file.writeAsBytes(encodePng(image));
+    await file.writeAsBytes(encodePng(image));
     print('Image saved to: $filePath');
   }
 
   return filePath;
 }
 
-List<int> detphToColor(int depth){
+List<int> detphToColor(double depth){
   num number = depth;
   number = number.clamp(0, 6);
 
-  // Calculate the red, green, and blue components based on depth
   int red = (255 - ((number / 6) * 255)).toInt();
-  int green = (number / 6 * 200).toInt(); // Adjust the green component
+  int green = (number / 6 * 200).toInt();
   int blue = ((number / 6) * 255).toInt();
 
-  // Return red, green, and blue components as a list
   return [red, green, blue];
+}
+
+Future<void> dataToTile() async {
+  Map map = await JsonHandler.openJson();
+  String? lake = await GPS().getLake();
+  // ignore: unnecessary_null_comparison
+  if (lake == null) {
+    return;
+  }
+  for (var i = 0; i < map[lake]["data"].length; i++) {
+    for (var j = 15; j < 19; j++) {
+      await createAndSetPixelColor(map[lake]["data"][i]["coordinates"][0], map[lake]["data"][i]["coordinates"][1], j, detphToColor(map[lake]["data"][i]["depth"]));
+    }
+  }
 }

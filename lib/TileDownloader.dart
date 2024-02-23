@@ -2,6 +2,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:lodka/json_handler.dart';
 import 'package:lodka/tiles.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart' show Uint8List;
@@ -22,7 +23,6 @@ class TileDownloader {
 
       for (int tileX = minTileX; tileX <= maxTileX; tileX++) {
         for (int tileY = minTileY; tileY <= maxTileY; tileY++) {
-          // Customize the tile provider URL based on your needs
           String tileUrl = 'https://tile.openstreetmap.org/$zoom/$tileX/$tileY.png';
 
           var response = await http.get(Uri.parse(tileUrl));
@@ -115,7 +115,7 @@ class _AddLakeState extends State<AddLake> {
       actions: <Widget>[
         TextButton(
           onPressed: () {
-            Navigator.of(context).pop(); // Close the dialog
+            Navigator.of(context).pop();
           },
           child: const Text('Cancel'),
         ),
@@ -126,8 +126,9 @@ class _AddLakeState extends State<AddLake> {
                   text: _textController.text,
                   bounds: LatLngBounds.fromPoints(widget.points));
               TileDownloader.downloadArea(LatLngBounds.fromPoints(widget.points));
-              Navigator.of(context).pop(addLakeData); // Pass the entered text back
+              Navigator.of(context).pop(addLakeData);
               TileDownloader.removeEverything();
+              JsonHandler.addToJson(_textController.text, LatLngBounds.fromPoints(widget.points));
             } else {
               setState(() {
                 error = true;

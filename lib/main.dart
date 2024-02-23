@@ -7,7 +7,9 @@ import 'package:flutter_joystick/flutter_joystick.dart';
 import 'package:flutter/services.dart';
 import 'package:lodka/TileDownloader.dart';
 import 'package:lodka/add_spot.dart';
-import 'package:lodka/centrovanieZasrate.dart';
+import 'centerNorth.dart';
+import 'package:lodka/json_handler.dart';
+import 'package:lodka/settings.dart';
 import 'package:lodka/tile_manager.dart';
 import 'bar.dart';
 import 'package:path_provider/path_provider.dart';
@@ -19,7 +21,7 @@ import 'wifi.dart';
 import 'tiles.dart';
 
 var directory;
-WiFi wifi = new WiFi();
+WiFi wifi = WiFi();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([
@@ -27,15 +29,15 @@ Future<void> main() async {
     DeviceOrientation.landscapeRight,
   ]);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-  //createAndSetPixelColor(48.209770, 17.728487, 18);
-  /*print(convertToTileCoordinates(48.209772, 17.728479, 18));
-  print(convertToWorldPixelCoordinates(48.209772, 17.728479, 18));*/
+  wifi.listenToWebsocket();
   directory = await getApplicationDocumentsDirectory();
 
   runApp(const MyApp());
 }
 
 const step = 10.0;
+double previousY = 0;
+double previousX = 0;
 bool showModal = false;
 
 class MyApp extends StatelessWidget {
@@ -59,20 +61,49 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  bool _isInit = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (!_isInit) {
+      _initializeData();
+      _isInit = true;
+    }
+  }
+
+  Future<void> _initializeData() async {
+    final spotsList = await JsonHandler.loadSpots();
+    Map spotsData = spotsList;
+    for (var i = 0; i < spotsData.length; i++) {
+      addSpot(
+          LatLng(spotsData.values.elementAt(i)[0],
+              spotsData.values.elementAt(i)[1]),
+          spotsData.keys.elementAt(i));
+    }
+    setState(() {});
+  }
+
   void addSpot(LatLng point, String name) {
     Marker marker = Marker(
-      point: LatLng(48.209595, 17.728527),
-      anchorPos: AnchorPos.align(AnchorAlign.top),
-      builder: (context) => ClickableMarker(onTapCallback: (p0) {
-        setState(() {
-          Bar.bar = !Bar.bar;
-          Bar.barText = p0;
-          print("banik");
-        });
-      },
-      color: Colors.blue)
-    );
+        point: LatLng(48.209595, 17.728527),
+        anchorPos: AnchorPos.align(AnchorAlign.top),
+        builder: (context) => ClickableMarker(
+            onTapCallback: (p0) {
+              setState(() {
+                if (Bar.bar) {
+                  Bar.barText = p0;
+                } else {
+                  Bar.bar = !Bar.bar;
+                  Bar.barText = p0;
+                }
+              });
+            },
+            name: name,
+            color: Colors.blue));
     Spots.markers.add(marker);
+    JsonHandler.addSpot(point, name);
   }
 
   MapController mapController = MapController();
@@ -93,11 +124,11 @@ class _HomePageState extends State<HomePage> {
               maxZoom: 18.49,
               center: LatLng(48.209634, 17.728898),
               zoom: 15,
-              minZoom: 15,
-              maxBounds: LatLngBounds(
+              //minZoom: 15,
+              /*maxBounds: LatLngBounds(
                 LatLng(48.20464469, 17.72107338),
                 LatLng(48.21285267, 17.74011334),
-              ),
+              ),*/
               onTap: (tapPosition, pointTap) {
                 setState(() {
                   Bar.bar = false;
@@ -110,7 +141,7 @@ class _HomePageState extends State<HomePage> {
               },
               onMapReady: () {
                 TileManager.selectLayer();
-                print(TileManager.layer.urlTemplate);
+                setState(() {});
               },
               enableMultiFingerGestureRace: true),
           children: [
@@ -126,6 +157,7 @@ class _HomePageState extends State<HomePage> {
                 backgroundColor: Colors.transparent,
                 tileProvider: AssetTileProvider(),
                 urlTemplate: "lib/offlineMap/{z}/{x}/{y}.png"),*/
+            TileManager.layer,
             TileLayer(
               tileProvider: FileTileProvider(),
               urlTemplate: "${directory.path}/heatMap/{z}/{x}/{y}.png",
@@ -138,23 +170,43 @@ class _HomePageState extends State<HomePage> {
               errorImage: const AssetImage("lib/error.png"),
               backgroundColor: Colors.transparent,
             ),*/
-            TileManager.layer,
             MarkerLayer(markers: [
               Marker(
-                  point: point,
+                  point: GPS.getLocationLatLng(),
                   anchorPos: AnchorPos.align(AnchorAlign.top),
                   builder: (ctx) {
                     return ClickableMarker(
-                        color: Colors.red,
-                        name: "You",
-                        onTapCallback: (name) {
-                          setState(() {
+                      color: Colors.red,
+                      name: "You",
+                      onTapCallback: (name) {
+                        setState(() {
+                          if (Bar.bar) {
+                            Bar.barText = name;
+                          } else {
                             Bar.bar = !Bar.bar;
                             Bar.barText = name;
-                          });
-                        },
-                      );
+                          }
+                        });
+                      },
+                    );
                   }),
+              Marker(
+                point: WiFi.position,
+                builder: (context) {
+                  return ClickableMarker(
+                    name: "Boat",
+                      onTapCallback: (name){
+                          setState(() {
+                            if (Bar.bar) {
+                              Bar.barText = name;
+                            } else {
+                              Bar.bar = !Bar.bar;
+                              Bar.barText = name;
+                            }
+                          });
+                      }, color: Colors.red);
+                },
+              )
             ]),
             MarkerLayer(markers: TileDownloader.markers),
             MarkerLayer(markers: Spots.markers),
@@ -175,10 +227,14 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: ElevatedButton(
                     onPressed: () {
-                      //createAndSetPixelColor(48.209780, 17.728482, 18, 0, 255, 0);
-                      //detphToColor(3);
-                      //downloadOpenStreetMapTile(18, 143981, 90896);
-                      print(Bar.barText);
+                      setState(() {
+                        wifi.returnHome();
+                      });
+                    },
+                    onLongPress: () {
+                      setState(() {
+                        wifi.setHome(GPS.getLocationLatLng());
+                      });
                     },
                     style: ElevatedButton.styleFrom(
                         shape: const CircleBorder(),
@@ -192,7 +248,11 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       ElevatedButton(
                         onPressed: () {
-                          setState(() {});
+                          setState(() {
+                            wifi.closeSocket();
+                            wifi.connectSocket();
+                            wifi.openChamber("left");
+                          });
                         },
                         style: ElevatedButton.styleFrom(
                             shape: const CircleBorder(),
@@ -204,7 +264,9 @@ class _HomePageState extends State<HomePage> {
                       ),
                       ElevatedButton(
                         onPressed: () {
-                          setState(() {});
+                          setState(() {
+                            wifi.openChamber("right");
+                          });
                         },
                         style: ElevatedButton.styleFrom(
                             shape: const CircleBorder(),
@@ -224,11 +286,25 @@ class _HomePageState extends State<HomePage> {
                       _x = _x + step * details.x;
                       _y = _y + step * details.y;
                       if (DateTime.now().millisecondsSinceEpoch - wifi.sent >
-                          200) {
-                        /*print("Sent x: "+details.x.toString());
-                        print("Sent y: "+details.y.toString());*/
+                              500 ||
+                          (details.y == 0 &&
+                              DateTime.now().millisecondsSinceEpoch -
+                                      wifi.sent >
+                                  100) ||
+                          ((0.05 < previousX &&
+                                  previousX < -0.05 &&
+                                  0.05 < previousY &&
+                                  previousY < -0.05) &&
+                              (details.x > -0.05 &&
+                                  details.x < 0.05 &&
+                                  details.y < 0.05 &&
+                                  details.y > -0.05))) {
+                        wifi.sent = DateTime.now().millisecondsSinceEpoch;
+                        print(DateTime.now());
+                        previousY = details.y * (-1);
+                        previousX = details.x * (-1);
                         wifi.sendWiFiData(
-                            details.x.toString(), details.y.toString());
+                            "{\"y\":${(details.y * (-1)).toString()}, \"x\":${(details.x * (-1)).toString()}}");
                       }
                     });
                   },
@@ -240,7 +316,7 @@ class _HomePageState extends State<HomePage> {
         Align(
           alignment: AlignmentDirectional.centerEnd,
           child: Padding(
-            padding: const EdgeInsets.only(right: 15, top: 20),
+            padding: const EdgeInsets.only(right: 15, top: 20, bottom: 10),
             child: Column(
               children: [
                 ElevatedButton(
@@ -248,7 +324,7 @@ class _HomePageState extends State<HomePage> {
                       setState(() {
                         Navigator.of(context).push(
                           PageRouteBuilder(
-                            opaque: false, // set to false
+                            opaque: false,
                             pageBuilder: (_, __, ___) =>
                                 Modal(showModal: showModal),
                           ),
@@ -264,7 +340,7 @@ class _HomePageState extends State<HomePage> {
                           return TextInputDialog(location: point);
                         },
                       );
-                      addSpot(point, "df");
+                      addSpot(point, dialogData.text);
                     },
                     style: ElevatedButton.styleFrom(
                         shape: const CircleBorder(),
@@ -289,7 +365,7 @@ class _HomePageState extends State<HomePage> {
                         TileDownloader.markers.length == 2,
                     child: ElevatedButton(
                         onPressed: () async {
-                          AddLakeData addLakeData = await showDialog(
+                          await showDialog(
                             context: context,
                             builder: (context) {
                               return AddLake(points: [
@@ -304,11 +380,20 @@ class _HomePageState extends State<HomePage> {
                           });
                         },
                         style: ElevatedButton.styleFrom(
-                            shape: const CircleBorder()),
+                            fixedSize: const Size(50, 50),
+                            shape: const CircleBorder(),
+                            padding: EdgeInsets.zero),
                         child: const Icon(
                           Icons.check_circle,
                           size: 50,
-                        )))
+                        ))),
+                        const Spacer(flex: 1),
+                        ElevatedButton(onPressed: () {
+                          Navigator.push(context, 
+                          MaterialPageRoute(builder: (context) => const Setttings()));
+                        },
+                        style: ElevatedButton.styleFrom(shape: const CircleBorder(), fixedSize: const Size(50, 50)),
+                        child: const Icon(Icons.settings))
               ],
             ),
           ),

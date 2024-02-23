@@ -1,25 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:lodka/json_handler.dart';
 
 Location location = Location();
 bool _serviceEnabled = false;
 PermissionStatus _permissionGranted = PermissionStatus.denied;
-// ignore: unused_element
 LocationData _locationData = LocationData.fromMap({'latitude': 0.0, 'longitude': 0.0});
 
-Future<dynamic> getLocation() async {
-  _serviceEnabled = await location.serviceEnabled();
-  if (!_serviceEnabled) {
-    _serviceEnabled = await location.requestService();
+class GPS {
+
+  static LatLng getLocationLatLng() {
+  double latitude = _locationData.latitude ?? 0.0;
+  double longitude = _locationData.longitude ?? 0.0;
+
+  LatLng coordinates = LatLng(latitude, longitude);
+  return coordinates;
   }
-  _permissionGranted = await location.hasPermission();
-  if (_permissionGranted == PermissionStatus.denied) {
-    _permissionGranted = await location.requestPermission();
+
+
+    Future<void> getLocation() async {
+    _serviceEnabled = await location.serviceEnabled();
+    if (!_serviceEnabled) {
+      _serviceEnabled = await location.requestService();
+    }
+    _permissionGranted = await location.hasPermission();
+    if (_permissionGranted == PermissionStatus.denied) {
+      _permissionGranted = await location.requestPermission();
+    }
+
+    _locationData = await location.getLocation();
+
+    location.onLocationChanged.listen((LocationData currentLocation) {
+      _locationData = currentLocation;
+    });
   }
-  Location().onLocationChanged.listen((LocationData currentLocation) {
-    _locationData = currentLocation;
-  });
-  _locationData = await location.getLocation();
+
+  Future<String?> getLake() async {
+    await getLocation();
+
+    Map map = await JsonHandler.openJson();
+
+    for (var i = 0; i < map.length; i++) {
+      List northwest = map.values.elementAt(i)["coords"][0];
+      List southEast = map.values.elementAt(i)["coords"][1];
+      if (_locationData.latitude! < northwest[0] && _locationData.latitude! > southEast[0] && _locationData.longitude! > northwest[1] && _locationData.longitude! < southEast[1]) {
+        return map.keys.elementAt(i);
+      }
+    }
+    print("${_locationData.latitude}, ${_locationData.longitude}");
+    return null;
+    }
 }
 
 class Position extends StatefulWidget {
@@ -43,8 +74,6 @@ class _PositionState extends State<Position> {
                 return const Text("nic", style: TextStyle(fontSize: 10),);
               }
             }
-            /*Text("${_locationData.latitude} ${_locationData.longitude}",
-          style: const TextStyle(fontSize: 10)),*/
 );
   }
 }

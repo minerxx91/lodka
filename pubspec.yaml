@@ -46,6 +46,7 @@ dependencies:
   flutter_blue: ^0.8.0
   path_provider: ^2.0.14
   image: ^3.0.2
+  web_socket_channel: ^2.2.0
 
 dev_dependencies:
   flutter_test:

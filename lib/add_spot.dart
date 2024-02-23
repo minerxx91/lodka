@@ -9,20 +9,6 @@ import 'bar.dart';
 
 class Spots {
   static List<Marker> markers = [];
-
-  /*static void addSpot(LatLng point, String name) {
-    Marker marker = Marker(
-      point: LatLng(48.209595, 17.728527),
-      anchorPos: AnchorPos.align(AnchorAlign.top),
-      builder: (context) => ClickableMarker(onTapCallback: (p0) {
-          Bar.bar = !Bar.bar;
-          Bar.barText = p0;
-          print("banik");
-      },
-      color: Colors.blue)
-    );
-    Spots.markers.add(marker);
-  }*/
 }
 
 class DialogData {
@@ -60,7 +46,7 @@ class _TextInputDialogState extends State<TextInputDialog> {
       actions: <Widget>[
         TextButton(
           onPressed: () {
-            Navigator.of(context).pop(); // Close the dialog
+            Navigator.of(context).pop();
           },
           child: const Text('Cancel'),
         ),
@@ -68,12 +54,11 @@ class _TextInputDialogState extends State<TextInputDialog> {
           onPressed: () {
             if (widget.location != null && _textController.text.isNotEmpty) {
               setState(() {
-                //Spots.addSpot(widget.location!, _textController.text);
               DialogData dialogData = DialogData(
                   text: _textController.text,
                   location: LatLng(48.209634, 17.728898));
               Navigator.of(context)
-                  .pop(dialogData); // Pass the entered text back
+                  .pop(dialogData);
               });
             } else {
               setState(() {

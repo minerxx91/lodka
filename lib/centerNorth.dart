@@ -31,7 +31,6 @@ class _CenterNorthState extends State<CenterNorth> {
   void initState() {
     super.initState();
     isRotated = widget.mapController.rotation != 0;
-    // Check for rotation changes periodically
     WidgetsBinding.instance.addPostFrameCallback((_) {
       checkRotation();
     });
@@ -51,7 +50,6 @@ class _CenterNorthState extends State<CenterNorth> {
         });
       }
     }
-    // Schedule the next check
     WidgetsBinding.instance.addPostFrameCallback((_) {
       checkRotation();
     });

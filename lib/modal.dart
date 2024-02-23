@@ -1,10 +1,12 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:lodka/add_spot.dart';
+import 'package:flutter/services.dart' show ByteData, Uint8List, rootBundle;
 import 'package:latlong2/latlong.dart';
+import 'package:lodka/wifi.dart';
+import 'package:path_provider/path_provider.dart';
 import 'TileDownloader.dart';
 
 class Modal extends StatefulWidget {
@@ -18,6 +20,7 @@ class Modal extends StatefulWidget {
 }
 
 class _ModalState extends State<Modal> {
+  WiFi wifi = WiFi();
   Map dataList = {};
   @override
   void initState() {
@@ -26,13 +29,34 @@ class _ModalState extends State<Modal> {
   }
 
   Future<void> loadData() async {
-    final String jsonString = await rootBundle.loadString('lib/data.json');
-    final jsonData = json.decode(jsonString);
-    final Map data = jsonData;
+    Map data = {};
+    final directory = await getApplicationDocumentsDirectory();
+    File file = File("${directory.path}/data.json");
+
+    if (await file.exists()) {
+      final String jsonString = await file.readAsString();
+      final jsonData = json.decode(jsonString);
+      data = jsonData;
+    } else {
+      try {
+        ByteData byteData = await rootBundle.load('lib/data.json');
+        Uint8List uint8List = byteData.buffer.asUint8List();
+        await file.writeAsBytes(uint8List);
+        String jsonString = utf8.decode(uint8List);
+        data = json.decode(jsonString);
+        // ignore: empty_catches
+      } catch (e) {}
+    }
 
     setState(() {
       dataList = data;
     });
+  }
+
+  Future<void> saveData() async {
+    final directory = await getApplicationDocumentsDirectory();
+    File file = File("${directory.path}/data.json");
+    file.writeAsString(jsonEncode(dataList));
   }
 
   var rng = Random();
@@ -66,7 +90,6 @@ class _ModalState extends State<Modal> {
                       itemCount: dataList.length,
                       itemBuilder: (context, index) {
                         final lakeName = dataList.keys.elementAt(index);
-                        print(dataList[lakeName]["spots"]);
                         return Card(
                           color: Colors.amber,
                           child: ExpansionTile(
@@ -79,23 +102,13 @@ class _ModalState extends State<Modal> {
                                         Expanded(
                                           flex: 1,
                                           child: IconButton(
-                                            icon: const Icon(Icons.edit),
-                                            color: Colors.blue,
-                                            onPressed: () {
-                                              setState(() {});
-                                            },
-                                          ),
-                                        ),
-                                        // Rename button
-                                        Expanded(
-                                          flex: 1,
-                                          child: IconButton(
                                             icon: const Icon(
                                                 Icons.delete_forever,
                                                 color: Colors.red),
                                             onPressed: () {
                                               setState(() {
                                                 dataList.remove(lakeName);
+                                                saveData();
                                               });
                                             },
                                           ),
@@ -121,10 +134,29 @@ class _ModalState extends State<Modal> {
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: dataList[lakeName]["spots"].length,
                                 itemBuilder: (context, spotIndex) {
-                                  print(spotIndex);
                                   return Card(
                                     color: Colors.amber,
-                                    child: Text("Spot: ${dataList[lakeName]["spots"].keys.elementAt(spotIndex)}"),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                      children: [
+                                        Text(
+                                            "Spot: ${dataList[lakeName]["spots"].keys.elementAt(spotIndex)}"),
+                                            const SizedBox(
+                                              width: 120,
+                                            ),
+                                        ElevatedButton(
+                                            onPressed: () {
+                                              setState(() {
+                                                wifi.autopilot(LatLng(
+                                                    dataList[lakeName]["spots"].values.elementAt(spotIndex)[0],dataList[lakeName]["spots"].values.elementAt(spotIndex)[1]));
+                                              });
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                                shape: const CircleBorder()),
+                                            child:
+                                                const Icon(Icons.drive_eta))
+                                      ],
+                                    ),
                                   );
                                 },
                               )
@@ -151,13 +183,6 @@ class _ModalState extends State<Modal> {
                       ElevatedButton(
                           onPressed: () {
                             setState(() {
-                              /*AddLakeData addLakeData = await showDialog(
-                                context: context,
-                                builder: (context) {
-                                  return AddLake(points: [],);
-                                },
-                              );*/
-                              //pridat rybnik do json
                               Navigator.pop(context);
                               TileDownloader.markArea =
                                   !TileDownloader.markArea;
