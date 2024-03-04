@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart' show Uint8List, rootBundle;
 import 'package:latlong2/latlong.dart';
 import 'package:lodka/json_handler.dart';
+import 'package:lodka/main.dart';
 import 'package:lodka/tiles.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:web_socket_channel/io.dart';
@@ -62,7 +63,7 @@ class WiFi{
   }
 
   void setHome(LatLng home){
-    String jsonString = '{"action":"setHome","lat":${home.latitude.toString()}, "lng":${home.longitude.toString()}}';
+    String jsonString = '{"action":"setHome","lat":"${home.latitude.toString()}", "lng":"${home.longitude.toString()}"}';
     channel.sink.add(jsonString);
   }
 
@@ -72,17 +73,17 @@ class WiFi{
   }
 
   void openChamber(String side){
-    String jsonString = '{"action":"openChamber","side":$side}';
+    String jsonString = '{"action":"openChamber","side":"$side"}';
     channel.sink.add(jsonString);
   }
 
   void releaseHook(String side){
-    String jsonString = '{"action":"releaseHook","side":$side}';
+    String jsonString = '{"action":"releaseHook","side": "$side"}';
     channel.sink.add(jsonString);
   }
 
   void autopilot(LatLng point){
-    String jsonString = '{"action":"autopilot","lat":${point.latitude}, "lng":${point.longitude}}';
+    String jsonString = '{"action":"autopilot","lat":"${point.latitude}", "lng":"${point.longitude}"}';
     channel.sink.add(jsonString);
   }
 

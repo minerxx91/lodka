@@ -53,7 +53,7 @@ class TileDownloader {
     builder: (context) => const Icon(
       Icons.location_searching,
       color: Colors.green,
-      size: 20,
+      size: 35,
     ));
     if (markers.length<2) {
       markers.add(marker);

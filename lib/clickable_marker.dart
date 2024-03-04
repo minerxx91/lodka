@@ -25,7 +25,7 @@ class _ClickableMarkerState extends State<ClickableMarker> {
       child: Icon(
         Icons.location_on,
         color: widget.color,
-        size: 40.0,
+        size: 35.0,
       ),
     );
   }

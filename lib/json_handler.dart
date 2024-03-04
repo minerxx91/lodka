@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:lodka/main.dart';
 import 'package:path_provider/path_provider.dart';
 import 'gps.dart';
 
@@ -14,6 +15,7 @@ class JsonHandler {
 
     final String jsonString = await file.readAsString();
     Map<String, dynamic> map = jsonDecode(jsonString);
+
     return map;
   }
 
@@ -62,5 +64,11 @@ class JsonHandler {
     "depth": depth,
     });
     await file.writeAsString(jsonEncode(map));
+  }
+
+  static Future<void> deleteHeatMap() async{
+    final directory = await getApplicationDocumentsDirectory();
+    Directory heatMapDirectory = Directory("${directory.path}/heatMap");
+    await heatMapDirectory.delete(recursive: true);
   }
 }

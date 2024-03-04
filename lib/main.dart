@@ -29,8 +29,8 @@ Future<void> main() async {
     DeviceOrientation.landscapeRight,
   ]);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-  wifi.listenToWebsocket();
   directory = await getApplicationDocumentsDirectory();
+  wifi.listenToWebsocket();
 
   runApp(const MyApp());
 }
@@ -61,6 +61,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  String layerDirectory = "${directory.path}/heatMap/{z}/{x}/{y}.png";
   bool _isInit = false;
 
   @override
@@ -69,8 +70,20 @@ class _HomePageState extends State<HomePage> {
 
     if (!_isInit) {
       _initializeData();
+      refreshMap();
       _isInit = true;
     }
+  }
+
+  void refreshMap() {
+    Timer.periodic(const Duration(seconds: 5), (Timer t) {
+      setState(() {
+        layerDirectory = "reload";
+        print(layerDirectory);
+        layerDirectory = "${directory.path}/heatMap/{z}/{x}/{y}.png";
+        print(layerDirectory);
+      });
+    });
   }
 
   Future<void> _initializeData() async {
@@ -160,7 +173,7 @@ class _HomePageState extends State<HomePage> {
             TileManager.layer,
             TileLayer(
               tileProvider: FileTileProvider(),
-              urlTemplate: "${directory.path}/heatMap/{z}/{x}/{y}.png",
+              urlTemplate: layerDirectory,
               errorImage: const AssetImage("lib/error.png"),
               backgroundColor: Colors.transparent,
             ),
@@ -192,6 +205,7 @@ class _HomePageState extends State<HomePage> {
                   }),
               Marker(
                 point: WiFi.position,
+                anchorPos: AnchorPos.align(AnchorAlign.top),
                 builder: (context) {
                   return ClickableMarker(
                     name: "Boat",
@@ -251,7 +265,13 @@ class _HomePageState extends State<HomePage> {
                           setState(() {
                             wifi.closeSocket();
                             wifi.connectSocket();
+                            //JsonHandler.deleteHeatMap();
                             wifi.openChamber("left");
+                          });
+                        },
+                        onLongPress: () {
+                          setState(() {
+                            wifi.releaseHook("left");
                           });
                         },
                         style: ElevatedButton.styleFrom(
@@ -266,6 +286,11 @@ class _HomePageState extends State<HomePage> {
                         onPressed: () {
                           setState(() {
                             wifi.openChamber("right");
+                          });
+                        },
+                        onLongPress: () {
+                          setState(() {
+                            wifi.releaseHook("right");
                           });
                         },
                         style: ElevatedButton.styleFrom(
